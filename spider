@@ -1,0 +1,37 @@
+#!/bin/php
+
+<?php
+require_once('./lib/http_client.php');
+require_once('./lib/config.php');
+require_once('./lib/function.php');
+require_once('./lib/constants.php');
+require_once('./lib/album.php');
+require_once('./lib/photo.php');
+
+$uin =  $config['uin'];
+$host_uin = $config['host_uin'];
+$cookie = $config['cookie'];
+$g_tk = get_anti_csrf_token($cookie);
+$header = get_http_header();
+$image_header = image_header();
+array_push($header, 'cookie: '.$cookie);
+$album_list = get_album_list($header, $uin, $host_uin, $g_tk);
+$album_json = json_encode($album_list, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+check_path_and_save('./json/album-list.json', $album_json);
+foreach($album_list as $album) {
+    echo '----------'.$album->name.'---------- 
+'; 
+  $album_id = $album->id;
+  $photos = get_photo_list($header, $uin, $host_uin, $g_tk, $album);
+  foreach($photos as $photo) {
+    echo $photo->url.'
+';
+    $photo_response = request($photo->url, $image_header);
+    if ($photo_response !== false) {
+       $hash = hash('sha256', $photo_resposne);
+      check_image_and_save('images/'.$album_id.'/'.$hash.'.jpg', $photo_response);
+    }
+  }
+  $json = json_encode($photos, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  check_path_and_save('./json/'.$album->id.'.json', $json);
+}
